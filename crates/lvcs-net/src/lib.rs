@@ -930,9 +930,10 @@ fn is_ancestor(store: &Store, ancestor: &lvcs_core::Oid, tip: &lvcs_core::Oid) -
 }
 
 pub fn generate_self_signed() -> Result<(CertificateDer<'static>, PrivateKeyDer<'static>)> {
-    let rcgen::CertifiedKey { cert, key_pair } =
+    let rcgen::CertifiedKey { cert, signing_key } =
         rcgen::generate_simple_self_signed(vec!["lvcs".to_string()])?;
-    let key = PrivatePkcs8KeyDer::from(key_pair.serialize_der());
+
+    let key = PrivatePkcs8KeyDer::from(signing_key.serialize_der());
     let cert = CertificateDer::from(cert);
     Ok((cert, PrivateKeyDer::from(key)))
 }
