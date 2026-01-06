@@ -29,6 +29,10 @@ impl LvcsIgnore {
 }
 
 fn contains_repo_dir(path: &Path) -> bool {
-    path.components()
-        .any(|component| matches!(component, Component::Normal(name) if name == ".repo"))
+    path.components().any(|component| {
+        matches!(
+            component,
+            Component::Normal(name) if name == crate::repo::REPO_DIR_NAME
+        )
+    })
 }

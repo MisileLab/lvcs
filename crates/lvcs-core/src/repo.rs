@@ -5,7 +5,8 @@ use thiserror::Error;
 
 use crate::util::atomic_write;
 
-pub const REPO_DIR_NAME: &str = ".repo";
+pub const REPO_DIR_NAME: &str = ".lvcs";
+pub const LEGACY_REPO_DIR_NAME: &str = ".repo";
 pub const OBJECTS_DIR: &str = "objects";
 pub const REFS_DIR: &str = "refs";
 pub const HEADS_DIR: &str = "heads";
@@ -55,14 +56,34 @@ impl Repo {
 
     pub fn open(worktree: impl AsRef<Path>) -> anyhow::Result<Self> {
         let root = worktree.as_ref();
+
         let repo_dir = root.join(REPO_DIR_NAME);
-        if !repo_dir.exists() {
-            return Err(RepoError::NotFound(repo_dir).into());
+        let legacy_repo_dir = root.join(LEGACY_REPO_DIR_NAME);
+
+        if repo_dir.exists() {
+            return Ok(Self {
+                worktree: root.to_path_buf(),
+                repo_dir,
+            });
         }
-        Ok(Self {
-            worktree: root.to_path_buf(),
-            repo_dir,
-        })
+
+        if legacy_repo_dir.exists() {
+            if repo_dir.exists() {
+                return Ok(Self {
+                    worktree: root.to_path_buf(),
+                    repo_dir,
+                });
+            }
+
+            fs::rename(&legacy_repo_dir, &repo_dir)?;
+
+            return Ok(Self {
+                worktree: root.to_path_buf(),
+                repo_dir,
+            });
+        }
+
+        Err(RepoError::NotFound(repo_dir).into())
     }
 
     pub fn worktree(&self) -> &Path {
@@ -122,6 +143,23 @@ mod tests {
             fs::read(root.join(REPO_DIR_NAME).join(HEAD_FILE)).expect("head file"),
             DEFAULT_HEAD_REF.as_bytes()
         );
+    }
+
+    #[test]
+    fn open_migrates_legacy_repo_dir_name() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let root = temp_dir.path();
+
+        Repo::init(root).expect("init repo");
+
+        let new_dir = root.join(REPO_DIR_NAME);
+        let legacy_dir = root.join(LEGACY_REPO_DIR_NAME);
+        fs::rename(&new_dir, &legacy_dir).expect("rename to legacy");
+
+        let repo = Repo::open(root).expect("open repo");
+        assert_eq!(repo.repo_dir(), root.join(REPO_DIR_NAME));
+        assert!(!legacy_dir.exists());
+        assert!(new_dir.exists());
     }
 
     #[test]

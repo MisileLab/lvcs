@@ -243,7 +243,7 @@ fn walk_dir(root: &Path) -> anyhow::Result<Vec<PathBuf>> {
     for entry in fs::read_dir(root)? {
         let entry = entry?;
         let path = entry.path();
-        if path.file_name() == Some(std::ffi::OsStr::new(".repo")) {
+        if path.file_name() == Some(std::ffi::OsStr::new(crate::repo::REPO_DIR_NAME)) {
             continue;
         }
         out.push(path.clone());
