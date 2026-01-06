@@ -1,0 +1,22 @@
+[workspace]
+members = ["crates/lvcs-core", "crates/lvcs-cli", "crates/lvcs-net"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+anyhow = "1.0"
+blake3 = "1.5"
+clap = { version = "4.5", features = ["derive"] }
+diffy = "0.3"
+fs2 = "0.4"
+ignore = "0.4"
+quinn = "0.11"
+rcgen = "0.13"
+rustls = "0.23"
+thiserror = "1.0"
+time = { version = "0.3", features = ["formatting"] }
+tokio = { version = "1.37", features = ["rt-multi-thread", "macros", "net", "io-util", "sync", "fs", "time"] }
+zstd = "0.13"
