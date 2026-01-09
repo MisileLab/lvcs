@@ -2,13 +2,21 @@
 
 ## Repository Layout
 
-- `.repo/` metadata directory
-- `.repo/objects/` loose content-addressed objects
-- `.repo/pack/` pack + index files
-- `.repo/refs/` references (branches, tags, remotes)
-- `.repo/HEAD` current reference
-- `.repo/MERGE_STATE` merge state (when conflicts exist)
-- `.repo/reflog` server-side reflog entries
+- `.lvcs/` metadata directory
+- `.lvcs/objects/` loose content-addressed objects
+- `.lvcs/pack/` pack + index files
+- `.lvcs/refs/` references (branches, tags, remotes)
+- `.lvcs/HEAD` current reference
+- `.lvcs/MERGE_STATE` merge state (when conflicts exist)
+- `.lvcs/reflog` server-side reflog entries
+
+## Config
+
+- `.lvcs/config` is an INI-style file
+- `[user]` supports:
+  - `auth` full author string for commits
+  - `name`
+  - `email`
 
 ## Object IDs
 
@@ -92,18 +100,18 @@
 
 ## Ignore Rules
 
-- Always ignore `.repo/**`
+- Always ignore `.lvcs/**`
 - `.lvcsignore` uses gitignore semantics (`#` comments, `!` negation, `**`, `/` anchors)
 
 ## Merge State
 
-- `.repo/MERGE_STATE` content:
+- `.lvcs/MERGE_STATE` content:
   - `base <oid>`
   - `other <oid>`
 
 ## Reflog (Server)
 
-- `.repo/reflog` lines:
+- `.lvcs/reflog` lines:
   - `unix_ts key_id ref old_oid new_oid force_flag`
 
 ## Network Protocol (QUIC)
@@ -144,10 +152,10 @@
 - `lvcs init` initializes a repository
 - `lvcs commit -m <msg>` snapshots worktree
 - `lvcs log` shows commit history with decorations
-- `lvcs tree [--long|--hash|--size]` shows snapshot tree
+- `lvcs ls-tree [--long|--hash|--size]` shows snapshot tree
 - `lvcs checkout [--force] <rev>` restores snapshot
 - `lvcs merge <rev>` performs 3-way merge
 - `lvcs gc` repacks reachable objects
 - `lvcs fsck` validates repository
-- `lvcs serve` runs QUIC server
+- `lvcs daemon` runs QUIC server
 - `lvcs fetch` and `lvcs push` sync with server

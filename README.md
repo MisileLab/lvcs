@@ -15,19 +15,32 @@ cargo build
 lvcs init
 lvcs commit -m "message"
 lvcs log
-lvcs tree --long
+lvcs ls-tree --long
 lvcs checkout <rev>
 lvcs merge <rev>
 lvcs gc
 lvcs fsck
 ```
 
+## Config
+
+Create `.lvcs/config` to set commit identity:
+
+```
+[user]
+name = Jane Doe
+email = jane@example.com
+auth = Jane Doe <jane@example.com>
+```
+
+`auth` overrides `name`/`email` when set.
+
 ## Remote Usage
 
 Start a server with repo and key entries:
 
 ```
-lvcs serve \
+lvcs daemon \
   --repo origin=/path/to/repo \
   --key key1:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef:readwrite
 ```

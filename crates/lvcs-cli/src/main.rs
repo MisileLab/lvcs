@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::env;
-use std::io::IsTerminal;
+use std::fs;
+use std::io::{ErrorKind, IsTerminal};
 use std::path::PathBuf;
 
 use anyhow::Result;
@@ -46,7 +47,7 @@ enum Commands {
         count: Option<usize>,
         rev: Option<String>,
     },
-    Tree {
+    LsTree {
         rev: Option<String>,
         #[arg(long)]
         long: bool,
@@ -65,7 +66,7 @@ enum Commands {
     },
     Gc,
     Fsck,
-    Serve {
+    Daemon {
         #[arg(long, default_value = "0.0.0.0:7447")]
         addr: String,
         #[arg(long = "repo")]
@@ -103,7 +104,7 @@ enum Commands {
         #[arg(long)]
         force: bool,
     },
-    ListRefs {
+    LsRemote {
         #[arg(long)]
         addr: String,
         #[arg(long)]
@@ -129,7 +130,7 @@ async fn main() -> Result<()> {
             let repo = Repo::open(".")?;
             let _lock = RepoLock::acquire(repo.repo_dir())?;
             let store = Store::new(repo.clone());
-            let author = author.unwrap_or_else(default_author);
+            let author = resolve_author(&repo, author)?;
             let timestamp = time::OffsetDateTime::now_utc().unix_timestamp();
             let result = commit_worktree(&repo, &store, author, timestamp, message)?;
             print_commit_result(&result, use_color);
@@ -154,7 +155,7 @@ async fn main() -> Result<()> {
                 );
             }
         }
-        Commands::Tree {
+        Commands::LsTree {
             rev,
             long,
             hash,
@@ -220,7 +221,7 @@ async fn main() -> Result<()> {
                 anyhow::bail!("fsck found issues");
             }
         }
-        Commands::Serve {
+        Commands::Daemon {
             addr,
             repos,
             keys,
@@ -308,7 +309,7 @@ async fn main() -> Result<()> {
             };
             client.push_from(&repo, vec![update], force).await?;
         }
-        Commands::ListRefs {
+        Commands::LsRemote {
             addr,
             repo: repo_name,
             key_id,
@@ -337,10 +338,98 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-fn default_author() -> String {
-    let user = env::var("LVCS_AUTHOR")
-        .ok()
-        .or_else(|| env::var("USER").ok());
+#[derive(Default)]
+struct UserConfig {
+    auth: Option<String>,
+    name: Option<String>,
+    email: Option<String>,
+}
+
+fn resolve_author(repo: &Repo, author_override: Option<String>) -> Result<String> {
+    if let Some(author) = author_override {
+        return Ok(author);
+    }
+    if let Ok(author) = env::var("LVCS_AUTHOR") {
+        if !author.trim().is_empty() {
+            return Ok(author);
+        }
+    }
+    let config = load_user_config(repo)?;
+    if let Some(author) = author_from_config(&config) {
+        return Ok(author);
+    }
+    Ok(fallback_author())
+}
+
+fn load_user_config(repo: &Repo) -> Result<UserConfig> {
+    let path = repo.repo_dir().join("config");
+    let contents = match fs::read_to_string(&path) {
+        Ok(contents) => contents,
+        Err(err) if err.kind() == ErrorKind::NotFound => return Ok(UserConfig::default()),
+        Err(err) => return Err(err.into()),
+    };
+    Ok(parse_user_config(&contents))
+}
+
+fn parse_user_config(contents: &str) -> UserConfig {
+    let mut out = UserConfig::default();
+    let mut section: Option<String> = None;
+    for line in contents.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') || line.starts_with(';') {
+            continue;
+        }
+        if line.starts_with('[') && line.ends_with(']') {
+            let name = line[1..line.len() - 1].trim().to_ascii_lowercase();
+            section = Some(name);
+            continue;
+        }
+        let (key, value) = match line.split_once('=') {
+            Some((key, value)) => (key.trim(), value.trim()),
+            None => continue,
+        };
+        if section.as_deref() != Some("user") {
+            continue;
+        }
+        match key.to_ascii_lowercase().as_str() {
+            "auth" => out.auth = Some(value.to_string()),
+            "name" => out.name = Some(value.to_string()),
+            "email" => out.email = Some(value.to_string()),
+            _ => {}
+        }
+    }
+    out
+}
+
+fn author_from_config(config: &UserConfig) -> Option<String> {
+    if let Some(author) = config
+        .auth
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        return Some(author.to_string());
+    }
+    let name = config
+        .name
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let email = config
+        .email
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    match (name, email) {
+        (Some(name), Some(email)) => Some(format!("{name} <{email}>")),
+        (Some(name), None) => Some(name.to_string()),
+        (None, Some(email)) => Some(email.to_string()),
+        (None, None) => None,
+    }
+}
+
+fn fallback_author() -> String {
+    let user = env::var("USER").ok();
     let host = env::var("HOSTNAME").ok();
     match (user, host) {
         (Some(user), Some(host)) => format!("{user} <{user}@{host}>"),

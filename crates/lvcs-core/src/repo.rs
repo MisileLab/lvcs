@@ -68,15 +68,7 @@ impl Repo {
         }
 
         if legacy_repo_dir.exists() {
-            if repo_dir.exists() {
-                return Ok(Self {
-                    worktree: root.to_path_buf(),
-                    repo_dir,
-                });
-            }
-
             fs::rename(&legacy_repo_dir, &repo_dir)?;
-
             return Ok(Self {
                 worktree: root.to_path_buf(),
                 repo_dir,
